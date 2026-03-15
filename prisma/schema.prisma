@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+enum Move {
+  ROCK
+  PAPER
+  SCISSORS
+}
+
+
+enum MatchResultType {
+  PLAYER_A_WIN
+  PLAYER_B_WIN
+  DRAW
+}
+
+enum SyncSource {
+  HISTORY_BACKFILL
+  HISTORY_RECONCILIATION
+  LIVE_SSE
+}
+
+model Player {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  matchesAsA Match[] @relation("PlayerA")
+  matchesAsB Match[] @relation("PlayerB")
+  wins       Match[] @relation("WinnerPlayer")
+  losses     Match[] @relation("LoserPlayer")
+
+  @@index([name])
+}
+
+model Match {
+  id             Int             @id @default(autoincrement())
+  gameId         String          @unique
+  playedAt       DateTime
+  playedDate     DateTime
+  playerAId      Int
+  playerBId      Int
+  playerAChoice  Move
+  playerBChoice  Move
+  resultType     MatchResultType
+  winnerPlayerId Int?
+  loserPlayerId  Int?
+  ingestedFrom   SyncSource
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  playerA        Player          @relation("PlayerA", fields: [playerAId], references: [id], onDelete: Restrict)
+  playerB        Player          @relation("PlayerB", fields: [playerBId], references: [id], onDelete: Restrict)
+  winnerPlayer   Player?         @relation("WinnerPlayer", fields: [winnerPlayerId], references: [id], onDelete: SetNull)
+  loserPlayer    Player?         @relation("LoserPlayer", fields: [loserPlayerId], references: [id], onDelete: SetNull)
+
+  @@index([playedAt])
+  @@index([playedDate])
+  @@index([playerAId])
+  @@index([playerBId])
+  @@index([winnerPlayerId])
+  @@index([playedDate, winnerPlayerId])
+  @@index([playedAt, winnerPlayerId])
+}
+
+model SyncState {
+  id                    Int      @id @default(autoincrement())
+  key                   String   @unique
+  backfillCursor        String?
+  backfillCompleted     Boolean  @default(false)
+  lastBackfillRunAt     DateTime?
+  lastReconcileRunAt    DateTime?
+  lastSseEventAt        DateTime?
+  latestKnownMatchTime  DateTime?
+  latestKnownGameId     String?
+  sseConnected          Boolean  @default(false)
+  isBackfillRunning     Boolean  @default(false)
+  isReconcileRunning    Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
