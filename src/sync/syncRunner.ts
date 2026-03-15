@@ -3,7 +3,6 @@
  *
  * Orchestrates all three data ingestion mechanisms:
  * 1. Historical Backfill - Progressive import of historical data
- * 2. Live SSE Stream - Real-time match ingestion
  * 3. Periodic Reconciliation - Gap-filling every 10 minutes
  *
  * Provides unified start/stop controls and graceful shutdown handling.
@@ -14,11 +13,7 @@ import {
   stopBackfillOrchestrator,
   getBackfillStatus,
 } from "./backfillOrchestrator.js";
-import {
-  connectToLiveStream,
-  disconnectFromLiveStream,
-  getSseConnectionStatus,
-} from "./liveStream.js";
+
 import {
   startReconciliationScheduler,
   stopReconciliationScheduler,

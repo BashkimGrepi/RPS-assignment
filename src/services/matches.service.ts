@@ -210,24 +210,3 @@ export const getPlayerStats = async (
   };
 };
 
-//gets all players with their total matches count
-
-export const getAllPlayers = async (): Promise<Array< {name: string,  totalMatches: number, createdAt: Date }>> => {
-  const players = await prisma.player.findMany({
-    orderBy: { name: "asc" },
-    include: {
-      _count: {
-        select: {
-          matchesAsA: true,
-          matchesAsB: true,
-        },
-      },
-    },
-  });
-
-  return players.map((player) => ({
-    name: player.name,
-    totalMatches: player._count.matchesAsA + player._count.matchesAsB,
-    createdAt: player.createdAt,
-  }));
-};
