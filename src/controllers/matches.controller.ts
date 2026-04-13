@@ -6,6 +6,9 @@ import {
   getMatchesByDay,
   getMatchesByDateAndPlayer,
 } from "../services/matches.service.js";
+import { getMatchesSchema } from "../utils/Zvalidation.js";
+
+
 
 // GET /api/matches
 // Optional query params:
@@ -14,42 +17,49 @@ import {
 // If no query params, return latest matches (up to 100)
 export async function getMatchesController(req: Request, res: Response) {
   try {
-    const { date, playerName } = req.query;
-
-    const dateStr = typeof date === "string" ? date : undefined;
-    const playerNameStr =
-      typeof playerName === "string" ? playerName : undefined;
+    const validatedQuery = getMatchesSchema.safeParse(req.query);
+    if (!validatedQuery.success) {
+      return res.status(400).json({
+        error: {
+          code: "INVALID_QUERY",
+          message: "Invalid query parameters",
+          details: validatedQuery.error.flatten()
+        }
+      });
+    }
+    const valDate = validatedQuery.data.date
+    const valPlayerName = validatedQuery.data.playerName;
 
     // Both filters
-    if (dateStr && playerNameStr) {
-      const matches = await getMatchesByDateAndPlayer(dateStr, playerNameStr);
-      const stats = await getPlayerStats(playerNameStr);
+    if (valDate && valPlayerName) {
+      const matches = await getMatchesByDateAndPlayer(valDate, valPlayerName);
+      const stats = await getPlayerStats(valPlayerName);
 
       return res.json({
         data: matches,
         count: matches.length,
         playerStats: {
-          player: playerNameStr,
+          player: valPlayerName,
           ...stats,
         },
       });
     }
 
     // Date only
-    if (dateStr) {
-      const matches = await getMatchesByDay(dateStr);
+    if (valDate) {
+      const matches = await getMatchesByDay(valDate);
       return res.json({ data: matches, count: matches.length });
     }
 
     // Player only
-    if (playerNameStr) {
-      const matches = await getMatchesByPlayer(playerNameStr);
-      const stats = await getPlayerStats(playerNameStr);
+    if (valPlayerName) {
+      const matches = await getMatchesByPlayer(valPlayerName);
+      const stats = await getPlayerStats(valPlayerName);
       return res.json({
         data: matches,
         count: matches.length,
         playerStats: {
-          player: playerNameStr,
+          player: valPlayerName,
           ...stats,
         },
       });
@@ -59,6 +69,11 @@ export async function getMatchesController(req: Request, res: Response) {
     const matches = await getLatestMatches(100);
     res.json({ data: matches, count: matches.length });
   } catch (error) {
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Internal server error",
+      }
+    });
   }
 }

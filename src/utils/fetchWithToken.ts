@@ -1,30 +1,14 @@
-import "dotenv/config";
-
+import { env } from "../config/env.js";
+import { HttpGet } from "../lib/client.js";
 // calls to legacy api with token in header
 
-interface FetchOptions {
-  method?: string;
-  headers?: Record<string, string>;
-}
 
-if (!process.env.BEARER_TOKEN) throw new Error("BEARER_TOKEN is not set");
-const token = process.env.BEARER_TOKEN;
+if (!env.BEARER_TOKEN) throw new Error("BEARER_TOKEN is not set");
 
-export const fetchWithToken = async (
-  url: string,
-  options: FetchOptions = {},
-): Promise<Response> => {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      //Authorization: `Bearer ${process.env.BEARER_TOKEN}`,
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
+export async function fetchWithToken<T>(url: string): Promise<T>  {
+  return HttpGet<T>(url, {
+    Authorization: `Bearer ${env.BEARER_TOKEN}`,
+    Accept: "application/json",
+  })
+} 
 
-  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-  return response;
-};

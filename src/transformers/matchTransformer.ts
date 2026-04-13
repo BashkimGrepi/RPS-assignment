@@ -4,72 +4,61 @@ import {
   MatchResultType,
 } from "../../generated/prisma/enums.js";
 import { LegacyGame } from "../types/rps-dto.js";
+import { TransformedMatch } from "../types/rps-dto.js";
 import {
   determineWinner,
   getResultType,
   stringToMove,
 } from "../utils/rpsLogic.js";
+import { legacyGameSchema } from "../utils/Zvalidation.js";
 
-/**
- * Transformed match ready for database insertion
- * This is the intermediate format between LegacyGame and Prisma Match model
- */
-export interface TransformedMatch {
-  gameId: string;
-  playedAt: Date;
-  playedDate: Date;
-  playerAName: string;
-  playerBName: string;
-  playerAChoice: Move;
-  playerBChoice: Move;
-  resultType: MatchResultType;
-  winnerPlayerName: string | null;
-  loserPlayerName: string | null;
-  ingestedFrom: SyncSource;
-}
 
-/**
- * Transform legacy API match data into database-ready format
- *
- * @param legacyGame - Raw match data from legacy API
- * @param source - Where this match came from (HISTORY_BACKFILL, LIVE_SSE, etc.)
- * @returns TransformedMatch ready for database insertion
- */
+// Transform LegacyGame to TransformedMatch format for database insertion
 export const transformLegacyMatch = (legacyGame: LegacyGame, source: SyncSource): TransformedMatch => {
-  // Convert string moves to Prisma Move enum
-  const playerAChoice = stringToMove(legacyGame.playerA.played);
-  const playerBChoice = stringToMove(legacyGame.playerB.played);
+  
+  // Validate legacy game data
+  const validLGame = legacyGameSchema.safeParse(legacyGame);
+  if (!validLGame.success) {
+    throw new Error(`Invalid legacy game data: ${JSON.stringify(legacyGame)}. Errors: ${JSON.stringify(validLGame.error.issues)}`);
+  }
 
-  // Determine winner
+
+  // Convert string moves to Prisma Move enum
+  const playerAChoice = stringToMove(validLGame.data.playerA.played);
+  const playerBChoice = stringToMove(validLGame.data.playerB.played);
+
+  // results
   const outcome = determineWinner(playerAChoice, playerBChoice);
   const resultType = getResultType(outcome);
 
-  // Convert timestamp to Date objects
-  const playedAt = new Date(legacyGame.time);
-  // playedDate should be date-only (normalized to midnight UTC)
+  // timestaps are in ms, converts to date obwjects
+  const playedAt = new Date(validLGame.data.time);
+  // (normalized to midnight UTC)
   const playedDate = new Date(
     playedAt.toISOString().split("T")[0] + "T00:00:00.000Z",
   );
 
-  // Determine winner and loser names
+ 
   let winnerPlayerName: string | null = null;
   let loserPlayerName: string | null = null;
 
-  if (outcome === "PLAYER_A") {
-    winnerPlayerName = legacyGame.playerA.name;
-    loserPlayerName = legacyGame.playerB.name;
+  if (outcome === "PLAYER_A") {    
+    winnerPlayerName = validLGame.data.playerA.name;
+    loserPlayerName = validLGame.data.playerB.name;
+
   } else if (outcome === "PLAYER_B") {
-    winnerPlayerName = legacyGame.playerB.name;
-    loserPlayerName = legacyGame.playerA.name;
+    winnerPlayerName = validLGame.data.playerB.name;
+    loserPlayerName = validLGame.data.playerA.name;
   }
   // If TIE, both remain null
 
+
   return {
-    gameId: legacyGame.gameId,
+    gameId: validLGame.data.gameId,
     playedAt,
     playedDate,
-    playerAName: legacyGame.playerA.name,
-    playerBName: legacyGame.playerB.name,
+    playerAName: validLGame.data.playerA.name,
+    playerBName: validLGame.data.playerB.name,
     playerAChoice,
     playerBChoice,
     resultType,

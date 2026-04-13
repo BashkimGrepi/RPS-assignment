@@ -2,46 +2,12 @@
 import { NormalizedGame, Throw, LegacyGame, Outcome } from "../types/rps-dto.js";
 import { Move, MatchResultType } from "../../generated/prisma/enums.js";
 
-
 const beats: Record<Throw, Throw> = {
   ROCK: "SCISSORS",
   PAPER: "ROCK",
   SCISSORS: "PAPER",
 };
 
-const determineOutcome = (throwA: Throw, throwB: Throw): Outcome => {
-  if (throwA === throwB) return "TIE";
-  if (beats[throwA] === throwB) return "PLAYER_A";
-  return "PLAYER_B";
-};
-
-
- // Normalize legacy game data to API response format
-
-export const normalizeGameOutcome = (raw: LegacyGame): NormalizedGame => {
-  const outcome = determineOutcome(raw.playerA.played, raw.playerB.played);
-  const winner =
-    outcome === "TIE"
-      ? null
-      : outcome === "PLAYER_A"
-        ? raw.playerA.name
-        : raw.playerB.name;
-  return {
-    gameId: raw.gameId,
-    time: raw.time,
-    date: new Date(raw.time).toISOString().split("T")[0],
-    playerA: {
-      name: raw.playerA.name,
-      played: raw.playerA.played,
-    },
-    playerB: {
-      name: raw.playerB.name,
-      played: raw.playerB.played,
-    },
-    winner,
-    isTie: outcome === "TIE",
-  };
-};
 
 // determine winner using prisma move
 export const determineWinner = (choiceA: Move, choiceB: Move): Outcome => {

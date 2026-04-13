@@ -1,14 +1,11 @@
 import { prisma } from "../lib/prisma.js";
 import type { Player, Match } from "../../generated/prisma/client.js";
-import { TransformedMatch } from "../transformers/matchTransformer.js";
+import { TransformedMatch } from "../types/rps-dto.js";
 
-/**
- * Find or create a player by name
- * Uses upsert to handle deduplication via unique name constraint
- *
- * @param name - Player name
- * @returns Player record
- */
+
+  // Find or create a player by name
+  // Uses upsert to handle deduplication via unique name constraint
+ 
 export const upsertPlayer = async (name: string): Promise<Player> => {
   return await prisma.player.upsert({
     where: { name },
@@ -17,46 +14,30 @@ export const upsertPlayer = async (name: string): Promise<Player> => {
   });
 };
 
-/**
- * Upsert a match by gameId with full deduplication
- * Ensures both players exist first, then upserts the match
- *
- * If match with same gameId already exists:
- * - Updates only the ingestedFrom field (to track multiple sources)
- *
- * @param transformedMatch - Transformed match data ready for database
- * @returns Match record
- */
+// Upsert a single match with player handling
+// Ensures players exist before creating the match
+
 export const upsertMatch = async (transformedMatch: TransformedMatch): Promise<Match> => {
-  // Step 1: Ensure both players exist in database
   const [playerA, playerB] = await Promise.all([
     upsertPlayer(transformedMatch.playerAName),
     upsertPlayer(transformedMatch.playerBName),
   ]);
 
-  // Step 2: Get winner/loser player IDs
   let winnerPlayerId: number | null = null;
   let loserPlayerId: number | null = null;
 
   if (transformedMatch.winnerPlayerName) {
-    // Winner will be one of the two players we just upserted
     if (transformedMatch.winnerPlayerName === transformedMatch.playerAName) {
       winnerPlayerId = playerA.id;
+      loserPlayerId = playerB.id;
     } else {
       winnerPlayerId = playerB.id;
-    }
-  }
-
-  if (transformedMatch.loserPlayerName) {
-    // Loser will be one of the two players we just upserted
-    if (transformedMatch.loserPlayerName === transformedMatch.playerAName) {
       loserPlayerId = playerA.id;
-    } else {
-      loserPlayerId = playerB.id;
     }
   }
 
-  // Step 3: Upsert the match (deduplication by unique gameId)
+
+
   return await prisma.match.upsert({
     where: { gameId: transformedMatch.gameId },
     update: {
@@ -80,23 +61,28 @@ export const upsertMatch = async (transformedMatch: TransformedMatch): Promise<M
   });
 };
 
-/**
- * Batch upsert multiple matches efficiently
- * Processes matches sequentially to avoid conflicts
- *
- * @param transformedMatches - Array of transformed matches
- * @returns Array of upserted Match records
- */
+
+//  Batch upsert multiple matches efficiently
+//  Processes matches sequentially to avoid conflicts
+ 
 export const upsertMatches = async (
   transformedMatches: TransformedMatch[],
-): Promise<Match[]> => {
+): Promise<[Match[], insertedCount: number, duplicateCount: number]> => {
   const results: Match[] = [];
+  let insertedCount = 0;
+  let duplicateCount = 0;
 
   // Process sequentially to avoid race conditions with player creation
   for (const transformedMatch of transformedMatches) {
     const match = await upsertMatch(transformedMatch);
+    if (match.createdAt.getTime() === match.updatedAt.getTime()) {
+      insertedCount++;
+    } else {
+      duplicateCount++;
+    }
+
     results.push(match);
   }
 
-  return results;
+  return [results, insertedCount, duplicateCount];
 };

@@ -1,22 +1,29 @@
-/**
- * Historical Backfill Module
- *
- * Progressively imports historical match data from legacy API using checkpointed cursor pagination.
- * Designed to be resumable - can stop/restart without losing progress.
- */
+// History Backfill Module
+// this module handles the historical backfill process, fetching old mathches from the legacy api /history
+// fills our database with historical matches
+
+
+// Rules for backfill:
+// old idea was that duplicate page from the legacy api means its completed. 
+// End is when we dont have a cursor for the next page or when we get an empty page.
 
 import { fetchHistoryPage } from "../services/legacy-api.service.js";
 import { transformLegacyMatch } from "../transformers/matchTransformer.js";
 import { upsertMatch } from "../db/upsertHelpers.js";
 import { prisma } from "../lib/prisma.js";
 import { SyncSource } from "../../generated/prisma/enums.js";
+import { env } from "../config/env.js";
 
-const SYNC_STATE_KEY = "main";
-const DELAY_BETWEEN_PAGES_MS = 100; // Rate limiting to avoid overwhelming API
+const SYNC_STATE_KEY = env.SYNC_STATE_KEY;
+let currentLatest: Date | null = null;
+let matchTime: Date | null = null;
+let latestKnownGameId: string | null = null;
+let matchesSeen: number | null = null;
+let matchesDublicates: number | null = null;
+let matchesInserted: number | null = null;
 
-/**
- * Get or create the main sync state record
- */
+
+// get or create sync state
 async function ensureSyncState() {
   return await prisma.syncState.upsert({
     where: { key: SYNC_STATE_KEY },
@@ -30,40 +37,41 @@ async function ensureSyncState() {
   });
 }
 
-/**
- * Delay helper for rate limiting batch runs
- */
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Check if a game already exists in the database
- */
-async function gameExists(gameId: string): Promise<boolean> {
-  const match = await prisma.match.findUnique({
-    where: { gameId },
+
+async function getExistingGameIds(gameIds: string[]) {
+  // Check which gameIds already exist in the database
+  const existingMatches = await prisma.match.findMany({
+    where: {
+      gameId: { in: gameIds },
+    },
+    select: { gameId: true },
   });
-  return !!match;
+
+  const existingGameIds = new Set(existingMatches.map((m) => m.gameId));
+  return existingGameIds;
 }
-/**
- * Run a single backfill cycle
- * Fetches one page, processes all matches, saves cursor
- *
- * @returns Object with completion status and matches processed
- */
+
+
+
+// runs one cycle of the backfill process - fetches one page, processes it, updates cursor and state 
 export async function runBackfillCycle(): Promise<{
   completed: boolean;
-  matchesProcessed: number;
-  allDuplicates: boolean;
-}> {
+  matchesSeen: number;
+  matchesInserted: number;
+  matchesDublicates: number;
+  stoppedBecause: "EMPTY_PAGE" | "NO_NEXT_CURSOR" | "IN_PROGRESS" | "ALREADY_COMPLETED" | "ERROR";}> {
   // Get current sync state
   const syncState = await ensureSyncState();
-
+  
   // Check if already completed
   if (syncState.backfillCompleted) {
-    console.log("📦 Backfill already completed");
-    return { completed: true, matchesProcessed: 0, allDuplicates: false };
+    console.log(" Backfill already completed");
+    return { completed: true, matchesSeen: 0, matchesInserted: 0, matchesDublicates: 0, stoppedBecause: "ALREADY_COMPLETED" };
   }
 
   // Mark backfill as running
@@ -75,13 +83,13 @@ export async function runBackfillCycle(): Promise<{
   try {
     // Fetch next page using saved cursor
     console.log(
-      `📥 Fetching history page (cursor: ${syncState.backfillCursor || "start"})...`,
+      `Fetching history page (cursor: ${syncState.backfillCursor || "start"})...`,
     );
     const page = await fetchHistoryPage(syncState.backfillCursor || undefined);
 
     // If no data, we've reached the end
     if (page.data.length === 0) {
-      console.log("✅ No more data - backfill complete!");
+      console.log("No more data - backfill complete!");
       await prisma.syncState.update({
         where: { key: SYNC_STATE_KEY },
         data: {
@@ -90,20 +98,20 @@ export async function runBackfillCycle(): Promise<{
           backfillCursor: null,
         },
       });
-      return { completed: true, matchesProcessed: 0, allDuplicates: false };
+      return { completed: true, matchesSeen: 0, matchesInserted: 0, matchesDublicates: 0, stoppedBecause: "EMPTY_PAGE" };
     }
 
     // Process each match - check for duplicates BEFORE saving
-    let processedCount = 0;
-    let duplicateCount = 0;
 
+
+    const duplicateGameIds = await getExistingGameIds(page.data.map(g => g.gameId));
+  
     for (const legacyGame of page.data) {
       try {
-        // ✅ Check if game already exists
-        const exists = await gameExists(legacyGame.gameId);
 
-        if (exists) {
-          duplicateCount++;
+        if (duplicateGameIds.has(legacyGame.gameId)) {
+          matchesDublicates = (matchesDublicates || 0) + 1;
+          matchesSeen = (matchesSeen || 0) + 1;
           continue; // Skip, already have it
         }
 
@@ -113,45 +121,47 @@ export async function runBackfillCycle(): Promise<{
           SyncSource.HISTORY_BACKFILL,
         );
         await upsertMatch(transformed);
-        processedCount++;
+        matchesInserted = (matchesInserted || 0) + 1;
+        matchesSeen = (matchesSeen || 0) + 1;
 
         // Update latest known match info
-        const matchTime = new Date(legacyGame.time);
-        const currentLatest = syncState.latestKnownMatchTime;
+        matchTime = new Date(legacyGame.time);
+        currentLatest = syncState.latestKnownMatchTime;
+
         if (!currentLatest || matchTime > currentLatest) {
-          await prisma.syncState.update({
-            where: { key: SYNC_STATE_KEY },
-            data: {
-              latestKnownMatchTime: matchTime,
-              latestKnownGameId: legacyGame.gameId,
-            },
-          });
+          currentLatest = matchTime;
+          latestKnownGameId = legacyGame.gameId;
         }
+
+        
       } catch (error) {
-        // Log error but continue processing other matches
-        console.error(`❌ Error processing match ${legacyGame.gameId}:`, error);
+        // Log, but continue processing other matches
+        console.error(`Error processing match ${legacyGame.gameId}:`, error);
       }
     }
 
-    console.log(
-      `✅ Processed ${processedCount} new matches, ${duplicateCount} duplicates`,
-    );
-
-    // ✅ If ALL games in this page were duplicates, we've caught up!
-    const allDuplicates = processedCount === 0 && duplicateCount > 0;
-
-    if (allDuplicates) {
-      console.log("🎉 Caught up with live data! Backfill complete.");
+    if (currentLatest) {
       await prisma.syncState.update({
         where: { key: SYNC_STATE_KEY },
         data: {
-          backfillCompleted: true,
-          isBackfillRunning: false,
-          backfillCursor: null,
+          latestKnownMatchTime: matchTime,
+          latestKnownGameId: latestKnownGameId,
         },
       });
-      return { completed: true, matchesProcessed: 0, allDuplicates: true };
     }
+
+    console.log(
+      `Processed ${matchesInserted} new matches, ${matchesDublicates} duplicates`,
+    );
+
+    // if all were dublicates, we might have reached the end,
+    // but for safety we will continue until empty page or no cursor to avoid false positives
+    const allDuplicates = matchesInserted === 0 && matchesDublicates && matchesDublicates > 0;
+
+    if (allDuplicates) {
+      console.log("All games in this page are duplicates... continuing to next page");
+    }
+
 
     // Save cursor for next iteration
     if (page.cursor) {
@@ -164,12 +174,14 @@ export async function runBackfillCycle(): Promise<{
       });
       return {
         completed: false,
-        matchesProcessed: processedCount,
-        allDuplicates: false,
+        matchesSeen: matchesSeen || 0,
+        matchesInserted: matchesInserted || 0,
+        matchesDublicates: matchesDublicates || 0,
+        stoppedBecause: "IN_PROGRESS",
       };
     } else {
       // No cursor = end of data
-      console.log("✅ No more pages - backfill complete!");
+      console.log("No more pages - backfill complete!");
       await prisma.syncState.update({
         where: { key: SYNC_STATE_KEY },
         data: {
@@ -180,8 +192,10 @@ export async function runBackfillCycle(): Promise<{
       });
       return {
         completed: true,
-        matchesProcessed: processedCount,
-        allDuplicates: false,
+        matchesSeen: matchesSeen || 0,
+        matchesInserted: matchesInserted || 0,
+        matchesDublicates: matchesDublicates || 0,
+        stoppedBecause: "EMPTY_PAGE",
       };
     }
   } catch (error) {
@@ -194,39 +208,5 @@ export async function runBackfillCycle(): Promise<{
   }
 }
 
-/**
- * Run multiple backfill cycles until completion or max cycles reached.
- */
-export async function runBackfillBatch(
-  maxCycles: number = Infinity,
-): Promise<number> {
-  let totalMatches = 0;
-  let cycleCount = 0;
 
-  console.log(
-    `🚀 Starting backfill batch (max ${maxCycles === Infinity ? "unlimited" : maxCycles} cycles)...`,
-  );
 
-  while (cycleCount < maxCycles) {
-    const result = await runBackfillCycle();
-    totalMatches += result.matchesProcessed;
-    cycleCount++;
-
-    if (result.completed) {
-      console.log(
-        `🎉 Backfill completed after ${cycleCount} cycles, ${totalMatches} total matches processed`,
-      );
-      break;
-    }
-
-    if (cycleCount % 10 === 0) {
-      console.log(
-        `📊 Progress: ${cycleCount} pages, ${totalMatches} matches processed so far...`,
-      );
-    }
-
-    await delay(DELAY_BETWEEN_PAGES_MS);
-  }
-
-  return totalMatches;
-}

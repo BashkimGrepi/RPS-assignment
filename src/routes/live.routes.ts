@@ -1,6 +1,5 @@
 import { Request, Router, Response  } from "express";
 import { addClient, removeClient } from "../services/live.service.js";
-import { error } from "console";
 
 
 const liveRouter = Router();
@@ -15,6 +14,7 @@ liveRouter.get("/stream", (req: Request, res: Response) => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("X-Accel-Buffering", "no"); 
 
     // Register client wiht broadcaster
     addClient(res);// this will keep the connection open and send eventt to the client
@@ -22,11 +22,6 @@ liveRouter.get("/stream", (req: Request, res: Response) => {
     // send initial connection message
     res.write(`:connected\n\n`);
 
-    // Handle client disconnect
-    req.on("close", () => {
-        console.error("sse client error", error);
-        removeClient(res);
-    });
 });
 
 export default liveRouter;

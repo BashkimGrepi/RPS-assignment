@@ -7,9 +7,10 @@
 
 import { runBackfillCycle } from "./historyBackfill.js";
 import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
+import { CATCHING_UP_INTERVAL_MS } from "../config/constants.js";
 
-const SYNC_STATE_KEY = "main";
-const CATCHING_UP_INTERVAL_MS = 5 * 1000; // 5 seconds - while catching up
+const SYNC_STATE_KEY = env.SYNC_STATE_KEY;
 
 let isRunning = false;
 let orchestratorInterval: NodeJS.Timeout | null = null;
@@ -20,12 +21,12 @@ let orchestratorInterval: NodeJS.Timeout | null = null;
  */
 export async function startBackfillOrchestrator(): Promise<void> {
   if (isRunning) {
-    console.log("⚠️  Backfill orchestrator already running");
+    console.log("Backfill orchestrator already running");
     return;
   }
   isRunning = true;
   console.log(
-    "🚀 Starting backfill orchestrator in CATCHING UP mode (5 sec interval)...",
+    "Starting backfill orchestrator in CATCHING UP mode (" + CATCHING_UP_INTERVAL_MS / 1000 + " sec interval)...",
   );
 
   // Initial check and start
@@ -63,14 +64,14 @@ async function runBackfillIfNeeded(): Promise<void> {
 
     // If no sync state, create it and start backfill
     if (!syncState) {
-      console.log("📦 No sync state found - initializing backfill...");
+      console.log("No sync state found - initializing backfill...");
       await runBackfillCycle();
       return;
     }
 
     // If already completed, stop orchestrator
     if (syncState.backfillCompleted) {
-      console.log("✅ Backfill already completed - stopping orchestrator");
+      console.log(" Backfill already completed - stopping orchestrator");
       stopBackfillOrchestrator();
       return;
     }
