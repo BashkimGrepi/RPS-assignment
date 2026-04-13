@@ -9,9 +9,7 @@ import { prisma } from "../lib/prisma.js";
 import { NormalizedGame } from "../types/rps-dto.js";
 import { MatchResultType } from "../../generated/prisma/enums.js";
 
-/**
- * Convert database Match to NormalizedGame format for API responses
- */
+
 function matchToNormalizedGame(match: any): NormalizedGame {
   return {
     gameId: match.gameId,
@@ -30,10 +28,7 @@ function matchToNormalizedGame(match: any): NormalizedGame {
   };
 }
 
-/**
- * Get latest matches from database
- * @param limit - Maximum number of matches to return (default: 100)
- */
+
 export const getLatestMatches = async (limit: number = 100): Promise<NormalizedGame[]> => {
   const matches = await prisma.match.findMany({
     take: limit,
@@ -49,9 +44,7 @@ export const getLatestMatches = async (limit: number = 100): Promise<NormalizedG
   return matches.map(matchToNormalizedGame);
 };
 
-/**
- * Get the single most recent match
- */
+
 export const getLatestHistoryMatch = async (): Promise<NormalizedGame | null> => {
     const match = await prisma.match.findFirst({
       orderBy: { playedAt: "desc" },
@@ -66,10 +59,7 @@ export const getLatestHistoryMatch = async (): Promise<NormalizedGame | null> =>
     return match ? matchToNormalizedGame(match) : null;
   };
 
-/**
- * Get matches for a specific day (UTC)
- * @param date - Date string in YYYY-MM-DD format
- */
+
 export const getMatchesByDay = async (date: string): Promise<NormalizedGame[]> => {
   const targetDate = new Date(date + "T00:00:00.000Z");
 
@@ -89,10 +79,7 @@ export const getMatchesByDay = async (date: string): Promise<NormalizedGame[]> =
   return matches.map(matchToNormalizedGame);
 };
 
-/**
- * Get all matches for a specific player
- * @param playerName - Player name (case-insensitive)
- */
+
 export const getMatchesByPlayer = async (playerName: string): Promise<NormalizedGame[]> => {
   // Find player first
   const player = await prisma.player.findUnique({
@@ -151,10 +138,7 @@ export const getMatchesByDateAndPlayer = async (
 };
 
 
-/**
- * Get player statistics
- * @param playerName - Player name
- */
+
 export const getPlayerStats = async (
   playerName: string,
 ): Promise<{

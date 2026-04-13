@@ -18,7 +18,6 @@ import { LegacyGame } from "../types/rps-dto.js";
 import { broadcast } from "../services/live.service.js";
 import { IMMEDIATE_DISCONNECT_THRESHOLD, COOLDOWN_DURATION, IMMEDIATE_FAILURE_LIMIT } from "../config/constants.js";
 import { legacyGameSchema } from "../utils/Zvalidation.js";
-import { transform } from "zod";
 
 
 let eventSource: EventSource | null = null;
@@ -62,7 +61,7 @@ async function processLiveEvent(eventData: string): Promise<boolean> {
     }
 
     
-    broadcast(transformed); // Broadcast to SSE clients
+    broadcast(transformed);
     return true;
   } catch (error) {
     console.error("Unexpected error processing live event:", error);
@@ -70,9 +69,7 @@ async function processLiveEvent(eventData: string): Promise<boolean> {
   }
 }
 
-/**
- * Attempt to reconnect with exponential backoff
- */
+// cooldown mode is triggered after 3 consecutive immediate disconnects (within threshold)
 function enterCooldownMode(): void {
   if (cooldownTimeout) {
     clearTimeout(cooldownTimeout);
@@ -120,9 +117,7 @@ function scheduleReconnect(): void {
   }, currentReconnectDelay);
 }
 
-/**
- * Connect to the live SSE stream
- */
+
 export function connectToLiveStream(): void {
   shouldMaintainConnection = true;
 
@@ -190,11 +185,8 @@ export function connectToLiveStream(): void {
 
     if (wasImmediate) {
       failureCount++;
-      console.warn(
-        `Immediate disconnect detected (${failureCount}/${IMMEDIATE_FAILURE_LIMIT})`,
-      );
+      console.warn(`Immediate disconnect detected (${failureCount}/${IMMEDIATE_FAILURE_LIMIT})`);
       
-      // If 3 consecutive immediate failures, enter cooldown
       if (failureCount >= IMMEDIATE_FAILURE_LIMIT) {
         console.error(
           "SSE cooldown detected - entering 20-minute cooldown mode",
@@ -214,26 +206,21 @@ export function connectToLiveStream(): void {
   };
 }
 
-/**
- * Disconnect from the live SSE stream
- */
+
 export function disconnectFromLiveStream(): void {
   console.log("Disconnecting from live SSE stream...");
   shouldMaintainConnection = false;
 
-  // Clear reconnection timeout
   if (reconnectTimeout) {
     clearTimeout(reconnectTimeout);
     reconnectTimeout = null;
   }
 
-  // Clear cooldown timeout
   if (cooldownTimeout) {
     clearTimeout(cooldownTimeout);
     cooldownTimeout = null;
   }
 
-  // Close EventSource connection
   if (eventSource) {
     eventSource.close();
     eventSource = null;
@@ -247,9 +234,7 @@ export function disconnectFromLiveStream(): void {
   console.log("Disconnected from live SSE stream");
 }
 
-/**
- * Get current SSE connection status
- */
+
 export function getSseConnectionStatus(): {
   connected: boolean;
   readyState: number | null;

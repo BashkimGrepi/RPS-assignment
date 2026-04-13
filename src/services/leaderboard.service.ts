@@ -1,19 +1,11 @@
-/**
- * Leaderboard Service - Database-First Architecture
- *
- * Uses SQL aggregation for efficient leaderboard calculations.
- * All data comes from PostgreSQL database.
- */
-
+// Leaderboard Service - Database-First Architecture
 import { LeaderboardRow } from "../types/leaderboard.js";
 import { prisma } from "../lib/prisma.js";
 import { MatchResultType } from "../../generated/prisma/enums.js";
 import { isValidUtcDateString } from "../utils/Zvalidation.js";
 import { getPlayerLossesInDateRange, getPlayerTiesInDateRange, getPlayerTotalMatchesInDateRange, getPlayerWinsInDateRange, mergeGroupedCounts } from "../utils/leaderboardHerlpers.js";
 
-/**
- * Get today's date in YYYY-MM-DD format (UTC)
- */
+
 const getTodayDateString = (): string => {
   const now = new Date();
   const year = now.getUTCFullYear();
@@ -213,7 +205,6 @@ async function buildLeaderboardFromDatabase(
   );
 
   // Sort by the specified criteria
-
   if (!["wins", "winRate"].includes(sortBy)) {
     throw new Error("Invalid sortBy value. Must be either 'wins' or 'winRate'");
   }
@@ -239,7 +230,7 @@ async function buildLeaderboardFromDatabase(
 }
 
 
-// this function is called in controller 
+// this old function is still called in controller 
 
 export const getTodayLeaderboard = async (sortBy: "wins" | "winRate" = "wins"): Promise<LeaderboardRow[]> => {
   const today = getTodayDateString();

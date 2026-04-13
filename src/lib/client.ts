@@ -4,21 +4,7 @@
 
 import { env } from "../config/env.js";
 
-type HttpMethod = "GET";
 
-type RequestOptions = {
-    method: HttpMethod;
-    headers: Record<string, string>;
-    body?: unknown;
-    timeoutMs?: number;
-    maxRetries?: number;
-}
-
-type HttpSuccess<T> = {
-    data: T;
-    status: number;
-    headers: Headers;
-}
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));

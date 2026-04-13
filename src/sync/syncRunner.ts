@@ -13,7 +13,7 @@ import {
   stopBackfillOrchestrator,
   getBackfillStatus,
 } from "./backfillOrchestrator.js";
-
+import { env } from "../config/env.js";
 import {
   startReconciliationScheduler,
   stopReconciliationScheduler,
@@ -22,19 +22,16 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { connectToLiveStream, disconnectFromLiveStream, getSseConnectionStatus } from "./liveStream.js";
 
-const SYNC_STATE_KEY = "main";
 
 let isSubsystemRunning = false;
 
-/**
- * Initialize SyncState record if it doesn't exist
- */
+
 async function ensureSyncState(): Promise<void> {
   await prisma.syncState.upsert({
-    where: { key: SYNC_STATE_KEY },
+    where: { key: env.SYNC_STATE_KEY },
     update: {}, // Don't overwrite existing state
     create: {
-      key: SYNC_STATE_KEY,
+      key: env.SYNC_STATE_KEY,
       backfillCursor: null,
       backfillCompleted: false,
       isBackfillRunning: false,
@@ -56,13 +53,12 @@ async function ensureSyncState(): Promise<void> {
  */
 export async function startSyncSubsystem(): Promise<void> {
   if (isSubsystemRunning) {
-    console.log("⚠️  Sync subsystem already running");
+    console.log("Sync subsystem already running");
     return;
   }
 
 
   try {
-    // Initialize SyncState if needed
     await ensureSyncState();
     console.log("Sync state initialized");
 
@@ -78,11 +74,8 @@ export async function startSyncSubsystem(): Promise<void> {
 
     isSubsystemRunning = true;
 
-    console.log(" SYNC SUBSYSTEM STARTED SUCCESSFULLY");
-
-    // update sync status in database
     await prisma.syncState.update({
-      where: { key: SYNC_STATE_KEY },
+      where: { key: env.SYNC_STATE_KEY },
       data: {
         sseConnected: true,
         isBackfillRunning: true,
@@ -97,16 +90,13 @@ export async function startSyncSubsystem(): Promise<void> {
   }
 }
 
-/**
- * Stop all sync subsystem processes (graceful shutdown)
- */
+// graceful shutdonwn
 async function stopSyncSubsystem(): Promise<void> {
 
   const teardownError: unknown[] = [];
 
-  // 
+  
   try {
-    // Stop all three sync mechanisms
     stopBackfillOrchestrator();
     console.log("historical backfill orchestrator stopped");
   } catch (error) {
@@ -115,7 +105,6 @@ async function stopSyncSubsystem(): Promise<void> {
   }
 
   try {
-    // Stop all three sync mechanisms
     disconnectFromLiveStream();
     console.log("Connected to live SSE stream disconnected");
   } catch (error) {
@@ -124,29 +113,26 @@ async function stopSyncSubsystem(): Promise<void> {
   }
 
   try {
-    // Stop all three sync mechanisms
     stopReconciliationScheduler();
     console.log("periodic reconciliation scheduler stopped");
   } catch (error) {
     console.error("Error during periodic reconciliation scheduler shutdown:", error);
     teardownError.push(error);
   }
-
-  // memory flag 
   isSubsystemRunning = false;
   console.log("SYNC SUBSYSTEM STOPPED");
 
 
   try {
     await prisma.syncState.upsert({
-      where: { key: SYNC_STATE_KEY },
+      where: { key: env.SYNC_STATE_KEY },
       update: {
         sseConnected: false,
         isBackfillRunning: false,
         isReconcileRunning: false,
       },
       create: {
-        key: SYNC_STATE_KEY,
+        key: env.SYNC_STATE_KEY,
         backfillCursor: null,
         isBackfillRunning: false,
         isReconcileRunning: false,
@@ -159,9 +145,7 @@ async function stopSyncSubsystem(): Promise<void> {
   }
 }
 
-/**
- * Get comprehensive sync subsystem status
- */
+
 export async function getSyncSubsystemStatus(): Promise<{
   subsystemRunning: boolean;
   backfill: {
@@ -186,7 +170,7 @@ export async function getSyncSubsystemStatus(): Promise<{
     };
   };
 }> {
-  // Get status from each subsystem
+
   const backfillStatus = await getBackfillStatus();
   const sseStatus = getSseConnectionStatus();
   const reconciliationStatus = getReconciliationStatus();
@@ -194,7 +178,7 @@ export async function getSyncSubsystemStatus(): Promise<{
   // Get database statistics
   const totalMatches = await prisma.match.count();
   const syncState = await prisma.syncState.findUnique({
-    where: { key: SYNC_STATE_KEY },
+    where: { key: env.SYNC_STATE_KEY },
   });
 
   return {
@@ -212,9 +196,7 @@ export async function getSyncSubsystemStatus(): Promise<{
   };
 }
 
-/**
- * Setup graceful shutdown handlers for process termination
- */
+
 export function setupGracefulShutdown(): void {
   const shutdown = async (signal: string) => {
     console.log(`${signal} received - initiating graceful shutdown`);

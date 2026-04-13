@@ -2,7 +2,7 @@
  * Periodic Reconciliation Module
  *
  * Fills gaps from missed SSE events by periodically fetching the newest history page.
- * This ensures we don't miss matches if the SSE stream disconnects or drops events.
+ * This ensures we don't miss matches if there are disconnections or dropped events.
  *
  * Strategy: Fetch only the first page of /history (newest matches) and upsert them.
  * Duplicate detection via gameId ensures no data duplication.

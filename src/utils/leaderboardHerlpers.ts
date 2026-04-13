@@ -1,5 +1,4 @@
 
-
 import { MatchResultType } from "../../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 
@@ -12,11 +11,9 @@ const addCountToMap = (
     map.set(playerId, (map.get(playerId) ?? 0) + count);
 };
 
-export const mergeGroupedCounts = (
-  rows: Array<{ playerId: number; count: number }>,
-): Map<number, number> => {
+export const mergeGroupedCounts = (rows: Array<{ playerId: number; count: number }>): Map<number, number> => {
   const results = new Map<number, number>();
-
+  
   for (const row of rows) {
     results.set(row.playerId, row.count);
   }

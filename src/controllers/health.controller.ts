@@ -8,7 +8,6 @@ import { prisma } from "../lib/prisma.js";
  */
 export async function getHealthStatus(req: Request, res: Response) {
   try {
-    // Check database connection
     let dbConnected = false;
     let dbError = null;
     try {
@@ -18,10 +17,8 @@ export async function getHealthStatus(req: Request, res: Response) {
       dbError = error.message;
     }
 
-    // Get sync subsystem status
     const syncStatus = await getSyncSubsystemStatus();
 
-    // Calculate overall health
     const isHealthy =
       dbConnected &&
       syncStatus.subsystemRunning &&

@@ -7,10 +7,10 @@ import { sortBySchema, historyLeaderboardQuerySchema } from "../utils/Zvalidatio
 
 
 
-/**
- * GET /api/leaderboard/today?sortBy=wins|winRate
- * Returns today's leaderboard aggregated from cached history
- */
+
+  //GET /api/leaderboard/today?sortBy=wins|winRate
+  //Returns today's leaderboard aggregated from cached history
+ 
 export async function getTodayLeaderboardController(
   req: Request,
   res: Response,

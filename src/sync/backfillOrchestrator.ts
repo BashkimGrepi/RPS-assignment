@@ -15,10 +15,7 @@ const SYNC_STATE_KEY = env.SYNC_STATE_KEY;
 let isRunning = false;
 let orchestratorInterval: NodeJS.Timeout | null = null;
 
-/**
- * Start the backfill orchestrator
- * Runs backfill cycles continuously until completion
- */
+// Runs backfill cycles continuously until completion
 export async function startBackfillOrchestrator(): Promise<void> {
   if (isRunning) {
     console.log("Backfill orchestrator already running");
@@ -40,21 +37,17 @@ export async function startBackfillOrchestrator(): Promise<void> {
   }, CATCHING_UP_INTERVAL_MS);
 }
 
-/**
- * Stop the backfill orchestrator
- */
+
 export function stopBackfillOrchestrator(): void {
   if (orchestratorInterval) {
     clearInterval(orchestratorInterval);
     orchestratorInterval = null;
   }
   isRunning = false;
-  console.log("🛑 Backfill orchestrator stopped");
+  console.log("Backfill orchestrator stopped");
 }
 
-/**
- * Check if backfill is needed and run a cycle if so
- */
+
 async function runBackfillIfNeeded(): Promise<void> {
   try {
     // Get sync state
@@ -82,7 +75,7 @@ async function runBackfillIfNeeded(): Promise<void> {
       if (lastRun) {
         const timeSinceLastRun = Date.now() - lastRun.getTime();
         if (timeSinceLastRun > 5 * 60 * 1000) {
-          console.log("⚠️  Backfill appears stuck - resetting and retrying...");
+          console.log("Backfill appears stuck - resetting and retrying...");
           await prisma.syncState.update({
             where: { key: SYNC_STATE_KEY },
             data: { isBackfillRunning: false },
@@ -93,24 +86,19 @@ async function runBackfillIfNeeded(): Promise<void> {
       }
     }
 
-    // Run a backfill cycle
     const result = await runBackfillCycle();
 
     if (result.completed) {
-      console.log(
-        "🎉 Backfill completed - reconciliation scheduler takes over.",
-      );
+      console.log("Backfill completed - reconciliation scheduler takes over.",);
       stopBackfillOrchestrator();
     }
   } catch (error) {
-    console.error("❌ Error in backfill orchestrator:", error);
+    console.error("Error in backfill orchestrator:", error);
     // Don't stop on error - will retry on next interval
   }
 }
 
-/**
- * Get backfill status
- */
+
 export async function getBackfillStatus(): Promise<{
   completed: boolean;
   isRunning: boolean;

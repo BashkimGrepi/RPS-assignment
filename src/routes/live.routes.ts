@@ -5,8 +5,6 @@ import { addClient, removeClient } from "../services/live.service.js";
 const liveRouter = Router();
 
 // /api/live-stream
-
-
 liveRouter.get("/stream", (req: Request, res: Response) => {
     console.log("new sse client connecting ")
 

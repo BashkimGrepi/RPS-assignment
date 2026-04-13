@@ -5,7 +5,6 @@ import { TransformedMatch } from "../types/rps-dto.js";
 
   // Find or create a player by name
   // Uses upsert to handle deduplication via unique name constraint
- 
 export const upsertPlayer = async (name: string): Promise<Player> => {
   return await prisma.player.upsert({
     where: { name },
@@ -16,7 +15,6 @@ export const upsertPlayer = async (name: string): Promise<Player> => {
 
 // Upsert a single match with player handling
 // Ensures players exist before creating the match
-
 export const upsertMatch = async (transformedMatch: TransformedMatch): Promise<Match> => {
   const [playerA, playerB] = await Promise.all([
     upsertPlayer(transformedMatch.playerAName),
@@ -64,7 +62,6 @@ export const upsertMatch = async (transformedMatch: TransformedMatch): Promise<M
 
 //  Batch upsert multiple matches efficiently
 //  Processes matches sequentially to avoid conflicts
- 
 export const upsertMatches = async (
   transformedMatches: TransformedMatch[],
 ): Promise<[Match[], insertedCount: number, duplicateCount: number]> => {

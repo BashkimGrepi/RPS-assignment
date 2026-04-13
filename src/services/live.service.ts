@@ -4,7 +4,6 @@ import { TransformedMatch } from "../types/rps-dto.js";
 
 const connectedClients = new Set<Response>();
 
-
 function validateBroadcastData(match: TransformedMatch): boolean {
   try {
     if (!match.gameId || typeof match.gameId !== "string") {

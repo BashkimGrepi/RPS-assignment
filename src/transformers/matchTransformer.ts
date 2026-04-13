@@ -1,33 +1,22 @@
-import {
-  SyncSource,
-  Move,
-  MatchResultType,
-} from "../../generated/prisma/enums.js";
+import { SyncSource } from "../../generated/prisma/enums.js";
 import { LegacyGame } from "../types/rps-dto.js";
 import { TransformedMatch } from "../types/rps-dto.js";
-import {
-  determineWinner,
-  getResultType,
-  stringToMove,
-} from "../utils/rpsLogic.js";
+import { determineWinner, getResultType, stringToMove } from "../utils/rpsLogic.js";
 import { legacyGameSchema } from "../utils/Zvalidation.js";
 
 
 // Transform LegacyGame to TransformedMatch format for database insertion
 export const transformLegacyMatch = (legacyGame: LegacyGame, source: SyncSource): TransformedMatch => {
   
-  // Validate legacy game data
   const validLGame = legacyGameSchema.safeParse(legacyGame);
   if (!validLGame.success) {
     throw new Error(`Invalid legacy game data: ${JSON.stringify(legacyGame)}. Errors: ${JSON.stringify(validLGame.error.issues)}`);
   }
 
 
-  // Convert string moves to Prisma Move enum
   const playerAChoice = stringToMove(validLGame.data.playerA.played);
   const playerBChoice = stringToMove(validLGame.data.playerB.played);
 
-  // results
   const outcome = determineWinner(playerAChoice, playerBChoice);
   const resultType = getResultType(outcome);
 
@@ -38,7 +27,6 @@ export const transformLegacyMatch = (legacyGame: LegacyGame, source: SyncSource)
     playedAt.toISOString().split("T")[0] + "T00:00:00.000Z",
   );
 
- 
   let winnerPlayerName: string | null = null;
   let loserPlayerName: string | null = null;
 
@@ -51,7 +39,6 @@ export const transformLegacyMatch = (legacyGame: LegacyGame, source: SyncSource)
     loserPlayerName = validLGame.data.playerA.name;
   }
   // If TIE, both remain null
-
 
   return {
     gameId: validLGame.data.gameId,

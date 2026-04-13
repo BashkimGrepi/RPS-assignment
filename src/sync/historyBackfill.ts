@@ -38,11 +38,6 @@ async function ensureSyncState() {
 }
 
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-
 async function getExistingGameIds(gameIds: string[]) {
   // Check which gameIds already exist in the database
   const existingMatches = await prisma.match.findMany({
@@ -199,7 +194,6 @@ export async function runBackfillCycle(): Promise<{
       };
     }
   } catch (error) {
-    // Mark as not running on error
     await prisma.syncState.update({
       where: { key: SYNC_STATE_KEY },
       data: { isBackfillRunning: false },
