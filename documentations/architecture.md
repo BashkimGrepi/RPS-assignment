@@ -8,7 +8,7 @@ We need to ingest external match data (huge unknown amount of it, and from a unr
 
 ## System Diagram
 
-![Architecture Overview - Subsystems](../assets/architecture-subsystem.png)
+![Architecture Overview - Subsystems](https://github.com/BashkimGrepi/Reaktor-assignment/blob/main/assets/N%C3%A4ytt%C3%B6kuva%202026-04-14%20124642.png)
 
 ---
 
