@@ -23,7 +23,7 @@ This is a backend subsystem that was designed to:
 - **SSE stream is not open** – `/api/live` does not broadcast events
 - **No real-time updates** – Leaderboards are empty
 
-This project was built as a **sandbox/learning exercise** for backend architecture patterns. See [docs/legacy-api.md](docs/legacy-api.md) for challenges and design decisions.
+This project was built as a **sandbox/learning exercise** for backend architecture patterns. See [documentations](documentations) for challenges and design decisions.
 
 ## Quick Start
 
